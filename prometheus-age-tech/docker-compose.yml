@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-prometheus-agetech-dev-key}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+    volumes:
+      - db-data:/app/src/data
+    restart: unless-stopped
+
+volumes:
+  db-data:
