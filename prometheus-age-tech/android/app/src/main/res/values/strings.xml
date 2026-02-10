@@ -15,4 +15,11 @@
     <string name="send_sos">SEND SOS</string>
     <string name="cancel">Cancel</string>
     <string name="back_to_home">Back to Home</string>
+    <string name="sos_emergency_call">Skubus iškvietimas</string>
+    <string name="daily_check_title">Dienos patikrinimas</string>
+    <string name="daily_check_done">Dienos patikrinimas atliktas!</string>
+    <string name="i_am_fine">Aš esu gerai</string>
+    <string name="emergency_contacts_title">Skubios pagalbos kontaktai</string>
+    <string name="sign_out">Atsijungti</string>
+    <string name="call">Skambinti</string>
 </resources>

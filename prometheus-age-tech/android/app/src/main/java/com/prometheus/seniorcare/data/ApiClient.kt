@@ -2,6 +2,10 @@ package com.prometheus.seniorcare.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -13,6 +17,29 @@ object ApiClient {
 
     private const val BASE_URL = "http://10.0.2.2:8000"
     private var authToken: String? = null
+
+    fun createService(): ApiService {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                authToken?.let { request.addHeader("Authorization", "Bearer $it") }
+                chain.proceed(request.build())
+            }
+            .build()
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl("$BASE_URL/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        return retrofit.create(ApiService::class.java)
+    }
 
     suspend fun login(username: String, password: String): Boolean {
         return withContext(Dispatchers.IO) {
