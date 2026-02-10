@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Prometheus AgeTech</string>
+    <string name="app_subtitle">Senior Protection Platform</string>
+    <string name="welcome_message">Welcome! How are you today?</string>
+    <string name="sos_button">SOS</string>
+    <string name="daily_checkin">Daily Check-In</string>
+    <string name="logout">Logout</string>
+    <string name="username_hint">Username</string>
+    <string name="password_hint">Password</string>
+    <string name="login_button">Login</string>
+    <string name="sos_title">Emergency SOS</string>
+    <string name="sos_sent">SOS Alert Sent!</string>
+    <string name="sos_help_message">Help is on the way. Your emergency contacts have been notified.</string>
+    <string name="send_sos">SEND SOS</string>
+    <string name="cancel">Cancel</string>
+    <string name="back_to_home">Back to Home</string>
+</resources>
