@@ -9,10 +9,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.prometheus.seniorcare.data.SeniorDataStore
 import com.prometheus.seniorcare.data.ApiClient
 import com.prometheus.seniorcare.data.LoginRequest
 import com.prometheus.seniorcare.data.SeniorDataStore
@@ -48,8 +48,10 @@ class LoginActivity : ComponentActivity() {
 fun LoginScreen(dataStore: SeniorDataStore, onLoginSuccess: () -> Unit) {
     var phoneNumber by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     Column(
@@ -60,17 +62,12 @@ fun LoginScreen(dataStore: SeniorDataStore, onLoginSuccess: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Prometheus AgeTech",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
+            text = "Prometheus SeniorCare",
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "Senior Protection Platform",
-            fontSize = 16.sp,
-            modifier = Modifier.padding(bottom = 48.dp)
-        )
+        Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = phoneNumber,
@@ -85,24 +82,30 @@ fun LoginScreen(dataStore: SeniorDataStore, onLoginSuccess: () -> Unit) {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
+            label = { Text("Slaptažodis") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation()
         )
 
-        if (errorMessage.isNotEmpty()) {
+        errorMessage?.let { message ->
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 8.dp)
+                text = message,
+                color = MaterialTheme.colorScheme.error
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         Button(
             onClick = {
+                if (phoneNumber.isBlank() || password.isBlank()) {
+                    errorMessage = "Užpildykite visus laukus"
+                    return@Button
+                }
+
+                isLoading = true
                 scope.launch {
                     isLoading = true
                     errorMessage = ""
@@ -135,9 +138,12 @@ fun LoginScreen(dataStore: SeniorDataStore, onLoginSuccess: () -> Unit) {
             enabled = !isLoading && phoneNumber.isNotBlank() && password.isNotBlank()
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
             } else {
-                Text(text = "Login", fontSize = 18.sp)
+                Text("Prisijungti")
             }
         }
     }
