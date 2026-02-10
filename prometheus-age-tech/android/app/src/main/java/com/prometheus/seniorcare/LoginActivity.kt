@@ -14,16 +14,16 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.prometheus.seniorcare.data.SeniorDataStore
 import com.prometheus.seniorcare.data.ApiClient
-import com.prometheus.seniorcare.data.models.LoginRequest
-import com.prometheus.seniorcare.ui.theme.SeniorCareTheme
+import com.prometheus.seniorcare.data.LoginRequest
+import com.prometheus.seniorcare.data.SeniorDataStore
 import kotlinx.coroutines.launch
 
 class LoginActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Check if already logged in
         val dataStore = SeniorDataStore(this)
+
+        // Skip login if already logged in
         if (dataStore.isLoggedIn()) {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
@@ -31,15 +31,21 @@ class LoginActivity : ComponentActivity() {
         }
 
         setContent {
-            SeniorCareTheme {
-                LoginScreen()
+            MaterialTheme {
+                LoginScreen(
+                    dataStore = dataStore,
+                    onLoginSuccess = {
+                        startActivity(Intent(this, MainActivity::class.java))
+                        finish()
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun LoginScreen() {
+fun LoginScreen(dataStore: SeniorDataStore, onLoginSuccess: () -> Unit) {
     var phoneNumber by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -66,8 +72,7 @@ fun LoginScreen() {
         OutlinedTextField(
             value = phoneNumber,
             onValueChange = { phoneNumber = it },
-            label = { Text("Telefono numeris") },
-            placeholder = { Text("+37061234567") },
+            label = { Text("Phone Number") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
@@ -102,42 +107,35 @@ fun LoginScreen() {
 
                 isLoading = true
                 scope.launch {
+                    isLoading = true
+                    errorMessage = ""
                     try {
-                        val apiService = ApiClient.createService()
-                        val response = apiService.login(
-                            LoginRequest(
-                                phone_number = phoneNumber,
-                                password = password
-                            )
-                        )
-
+                        val service = ApiClient.createService()
+                        val response = service.login(LoginRequest(phoneNumber, password))
                         if (response.isSuccessful) {
-                            val loginResponse = response.body()
-                            if (loginResponse == null) {
-                                errorMessage = "Neteisingi duomenys"
-                                return@launch
+                            val body = response.body()
+                            if (body != null) {
+                                dataStore.saveAuthToken(body.access_token)
+                                dataStore.saveUserId(body.user.id)
+                                dataStore.saveUserName(body.user.full_name)
+                                dataStore.saveUserPhone(body.user.phone_number)
+                                onLoginSuccess()
+                            } else {
+                                errorMessage = "Invalid response from server."
                             }
-                            val dataStore = SeniorDataStore(context)
-
-                            dataStore.saveAuthToken(loginResponse.access_token)
-                            dataStore.saveUserId(loginResponse.user.id)
-                            dataStore.saveUserName(loginResponse.user.full_name)
-
-                            val intent = Intent(context, MainActivity::class.java)
-                            context.startActivity(intent)
-                            (context as? LoginActivity)?.finish()
                         } else {
-                            errorMessage = "Neteisingi duomenys"
+                            errorMessage = "Invalid credentials. Please try again."
                         }
                     } catch (e: Exception) {
-                        errorMessage = "Klaida: ${e.message}"
-                    } finally {
-                        isLoading = false
+                        errorMessage = "Connection error. Please check your network."
                     }
+                    isLoading = false
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            enabled = !isLoading && phoneNumber.isNotBlank() && password.isNotBlank()
         ) {
             if (isLoading) {
                 CircularProgressIndicator(

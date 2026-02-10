@@ -22,11 +22,8 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.prometheus.seniorcare.data.ApiClient
+import com.prometheus.seniorcare.data.SOSRequest
 import com.prometheus.seniorcare.data.SeniorDataStore
-import com.prometheus.seniorcare.data.models.SOSRequest
-import com.prometheus.seniorcare.ui.theme.SeniorCareTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class SOSActivity : ComponentActivity() {
@@ -34,19 +31,33 @@ class SOSActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
+        val dataStore = SeniorDataStore(this)
+
+        // Request location permission for GPS sharing
+        if (ActivityCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST
+            )
+        }
 
         setContent {
-            SeniorCareTheme {
-                SOSScreen()
+            MaterialTheme {
+                SOSScreen(dataStore = dataStore, onBackClick = { finish() })
             }
         }
     }
 }
 
 @Composable
-fun SOSScreen() {
-    val context = LocalContext.current
+fun SOSScreen(dataStore: SeniorDataStore, onBackClick: () -> Unit) {
+    var alertSent by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var countdown by remember { mutableStateOf(10) }
     var locationSent by remember { mutableStateOf(false) }
@@ -128,23 +139,30 @@ private fun sendSOSAlert(context: android.content.Context, scope: CoroutineScope
                         val userId = dataStore.getUserId()
                         val token = dataStore.getAuthToken()
 
-                        val apiService = ApiClient.createService(token)
-                        val sosRequest = SOSRequest(
-                            senior_id = userId,
-                            latitude = location.latitude,
-                            longitude = location.longitude,
-                            timestamp = System.currentTimeMillis()
-                        )
-
-                        // Call API
-                        scope.launch {
-                            try {
-                                apiService.sendSOSAlert(sosRequest)
-                                onLocationSent()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
+            Button(
+                onClick = {
+                    scope.launch {
+                        isLoading = true
+                        try {
+                            val token = dataStore.getAuthToken()
+                            val userId = dataStore.getUserId()
+                            if (token != null && userId != null) {
+                                val service = ApiClient.createService(token)
+                                val request = SOSRequest(
+                                    senior_id = userId,
+                                    latitude = 0.0,
+                                    longitude = 0.0,
+                                    timestamp = System.currentTimeMillis()
+                                )
+                                val response = service.sendSOSAlert(request)
+                                if (response.isSuccessful) {
+                                    alertSent = true
+                                }
                             }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
+                        isLoading = false
                     }
                 }
             }

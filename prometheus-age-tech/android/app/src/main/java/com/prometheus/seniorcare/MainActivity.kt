@@ -22,13 +22,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import com.prometheus.seniorcare.ui.theme.SeniorCareTheme
 import com.prometheus.seniorcare.data.SeniorDataStore
-import com.prometheus.seniorcare.data.ApiClient
-import com.prometheus.seniorcare.data.models.Contact
 import com.prometheus.seniorcare.services.DailyCheckService
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -38,20 +34,27 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        dataStore = SeniorDataStore(this)
+        val dataStore = SeniorDataStore(this)
 
-        // Redirect to login if not authenticated
-        if (!dataStore.isLoggedIn()) {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return
-        }
+        // Start daily check service
+        val serviceIntent = Intent(this, DailyCheckService::class.java)
+        startService(serviceIntent)
 
         setContent {
             SeniorCareTheme {
                 MainScreen(
-                    onSOSClick = { startSOS() },
-                    onLogout = { logout() }
+                    userName = dataStore.getUserName() ?: "User",
+                    onSOSClick = {
+                        startActivity(Intent(this, SOSActivity::class.java))
+                    },
+                    onCheckInClick = { /* Daily check-in logic */ },
+                    onLogoutClick = {
+                        lifecycleScope.launch {
+                            dataStore.clearAuth()
+                        }
+                        startActivity(Intent(this, LoginActivity::class.java))
+                        finish()
+                    }
                 )
             }
         }
@@ -95,15 +98,18 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
+    userName: String,
     onSOSClick: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var seniorName by remember { mutableStateOf("") }
-    var emergencyContacts by remember { mutableStateOf<List<Contact>>(emptyList()) }
-    var dailyCheckDone by remember { mutableStateOf(false) }
+        Text(
+            text = "Welcome, $userName! How are you today?",
+            fontSize = 20.sp,
+            modifier = Modifier.padding(16.dp)
+        )
 
     LaunchedEffect(Unit) {
         val dataStore = SeniorDataStore(context)
