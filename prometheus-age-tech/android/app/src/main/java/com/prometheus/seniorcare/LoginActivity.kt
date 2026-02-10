@@ -83,10 +83,10 @@ fun LoginScreen() {
             visualTransformation = PasswordVisualTransformation()
         )
 
-        if (errorMessage != null) {
+        errorMessage?.let { message ->
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = errorMessage!!,
+                text = message,
                 color = MaterialTheme.colorScheme.error
             )
         }
@@ -113,11 +113,15 @@ fun LoginScreen() {
 
                         if (response.isSuccessful) {
                             val loginResponse = response.body()
+                            if (loginResponse == null) {
+                                errorMessage = "Neteisingi duomenys"
+                                return@launch
+                            }
                             val dataStore = SeniorDataStore(context)
 
-                            dataStore.saveAuthToken(loginResponse?.access_token ?: "")
-                            dataStore.saveUserId(loginResponse?.user?.id ?: "")
-                            dataStore.saveUserName(loginResponse?.user?.full_name ?: "")
+                            dataStore.saveAuthToken(loginResponse.access_token)
+                            dataStore.saveUserId(loginResponse.user.id)
+                            dataStore.saveUserName(loginResponse.user.full_name)
 
                             val intent = Intent(context, MainActivity::class.java)
                             context.startActivity(intent)

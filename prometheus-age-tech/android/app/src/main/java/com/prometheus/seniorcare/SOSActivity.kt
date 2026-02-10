@@ -58,9 +58,9 @@ fun SOSScreen() {
             countdown--
         }
 
-        // When countdown reaches 0, send SOS
-        if (countdown == 0) {
-            sendSOSAlert(context, scope)
+        // Countdown reached 0, send SOS
+        sendSOSAlert(context, scope) {
+            locationSent = true
         }
     }
 
@@ -112,7 +112,7 @@ fun SOSScreen() {
     }
 }
 
-private fun sendSOSAlert(context: android.content.Context, scope: CoroutineScope) {
+private fun sendSOSAlert(context: android.content.Context, scope: CoroutineScope, onLocationSent: () -> Unit = {}) {
     scope.launch {
         try {
             // Get current location
@@ -140,6 +140,7 @@ private fun sendSOSAlert(context: android.content.Context, scope: CoroutineScope
                         scope.launch {
                             try {
                                 apiService.sendSOSAlert(sosRequest)
+                                onLocationSent()
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
