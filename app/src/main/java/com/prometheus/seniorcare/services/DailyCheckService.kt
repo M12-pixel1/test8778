@@ -16,6 +16,7 @@ class DailyCheckService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createNotificationChannel()
         showDailyCheckNotification()
+        stopSelf()
         return START_NOT_STICKY
     }
 

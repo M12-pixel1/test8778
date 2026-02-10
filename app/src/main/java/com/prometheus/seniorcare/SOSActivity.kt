@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.CountDownTimer
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.DisposableEffect
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -58,8 +59,8 @@ fun SOSScreen(
     var countdown by remember { mutableIntStateOf(5) }
     var isCancelled by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        object : CountDownTimer(5000, 1000) {
+    DisposableEffect(Unit) {
+        val timer = object : CountDownTimer(5000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 countdown = (millisUntilFinished / 1000).toInt()
             }
@@ -70,6 +71,10 @@ fun SOSScreen(
                 }
             }
         }.start()
+
+        onDispose {
+            timer.cancel()
+        }
     }
 
     Column(
