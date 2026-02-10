@@ -1,11 +1,12 @@
 """SQLite database layer."""
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional
 
-DATABASE_PATH = "prometheus_agetech.db"
+DATABASE_PATH = os.getenv("DATABASE_PATH", "prometheus_agetech.db")
 
 
 def get_connection():

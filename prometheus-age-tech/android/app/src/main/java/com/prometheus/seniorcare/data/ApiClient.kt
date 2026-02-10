@@ -71,10 +71,10 @@ object ApiClient {
         }
     }
 
-    suspend fun dailyCheckIn(mood: String, notes: String? = null): Boolean {
+    suspend fun dailyCheckIn(seniorId: Int, mood: String, notes: String? = null): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val url = URL("$BASE_URL/seniors/me/checkin")
+                val url = URL("$BASE_URL/seniors/$seniorId/checkin")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json")
