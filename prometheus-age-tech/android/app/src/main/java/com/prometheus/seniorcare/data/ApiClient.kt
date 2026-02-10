@@ -2,6 +2,10 @@ package com.prometheus.seniorcare.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Interceptor
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -11,13 +15,38 @@ import java.net.URL
  */
 object ApiClient {
 
-    private const val BASE_URL = "http://10.0.2.2:8000"
+    private const val BASE_URL = "http://10.0.2.2:8000/"
     private var authToken: String? = null
+
+    /**
+     * Creates a Retrofit-based ApiService instance.
+     * @param token Optional auth token for authenticated requests.
+     */
+    fun createService(token: String? = null): ApiService {
+        val clientBuilder = OkHttpClient.Builder()
+
+        if (token != null) {
+            clientBuilder.addInterceptor(Interceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("Authorization", "Bearer $token")
+                    .build()
+                chain.proceed(request)
+            })
+        }
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(clientBuilder.build())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        return retrofit.create(ApiService::class.java)
+    }
 
     suspend fun login(username: String, password: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val url = URL("$BASE_URL/auth/login")
+                val url = URL("${BASE_URL}auth/login")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json")
@@ -48,7 +77,7 @@ object ApiClient {
     ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val url = URL("$BASE_URL/seniors/sos/alert")
+                val url = URL("${BASE_URL}seniors/sos/alert")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json")
@@ -74,7 +103,7 @@ object ApiClient {
     suspend fun dailyCheckIn(seniorId: Int, mood: String, notes: String? = null): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val url = URL("$BASE_URL/seniors/$seniorId/checkin")
+                val url = URL("${BASE_URL}seniors/$seniorId/checkin")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json")
