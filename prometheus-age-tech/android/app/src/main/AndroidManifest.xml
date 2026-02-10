@@ -31,7 +31,6 @@
 
         <service
             android:name=".services.DailyCheckService"
-            android:foregroundServiceType="dataSync"
             android:exported="false" />
 
     </application>

@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.prometheus.seniorcare.data.SeniorDataStore
 import com.prometheus.seniorcare.services.DailyCheckService
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -36,7 +37,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onCheckInClick = { /* Daily check-in logic */ },
                     onLogoutClick = {
-                        kotlinx.coroutines.MainScope().launch {
+                        lifecycleScope.launch {
                             dataStore.clearAuth()
                         }
                         startActivity(Intent(this, LoginActivity::class.java))
