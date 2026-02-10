@@ -20,8 +20,10 @@ class SeniorDataStore(context: Context) {
     }
 
     fun saveAuthToken(token: String) {
-        prefs.edit().putString(KEY_AUTH_TOKEN, token).apply()
-        prefs.edit().putBoolean(KEY_IS_LOGGED_IN, true).apply()
+        prefs.edit()
+            .putString(KEY_AUTH_TOKEN, token)
+            .putBoolean(KEY_IS_LOGGED_IN, true)
+            .apply()
     }
 
     fun getAuthToken(): String {

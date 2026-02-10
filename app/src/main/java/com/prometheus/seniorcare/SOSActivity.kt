@@ -61,7 +61,7 @@ fun SOSScreen() {
 
         // When countdown reaches 0, send SOS
         if (countdown == 0) {
-            sendSOSAlert(context, scope)
+            sendSOSAlert(context, scope) { locationSent = true }
         }
     }
 
@@ -113,7 +113,7 @@ fun SOSScreen() {
     }
 }
 
-private fun sendSOSAlert(context: Context, scope: CoroutineScope) {
+private fun sendSOSAlert(context: Context, scope: CoroutineScope, onLocationSent: () -> Unit) {
     scope.launch {
         try {
             // Get current location
@@ -137,10 +137,11 @@ private fun sendSOSAlert(context: Context, scope: CoroutineScope) {
                             timestamp = System.currentTimeMillis()
                         )
 
-                        // Call API in a coroutine
+                        // Call API
                         scope.launch {
                             try {
                                 apiService.sendSOSAlert(sosRequest)
+                                onLocationSent()
                             } catch (e: Exception) {
                                 // Log error but don't block emergency call
                             }

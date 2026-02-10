@@ -113,11 +113,15 @@ fun LoginScreen() {
 
                         if (response.isSuccessful) {
                             val loginResponse = response.body()
-                            val dataStore = SeniorDataStore(context)
+                            if (loginResponse == null) {
+                                errorMessage = "Neteisingas serverio atsakymas"
+                                return@launch
+                            }
 
-                            dataStore.saveAuthToken(loginResponse?.access_token ?: "")
-                            dataStore.saveUserId(loginResponse?.user?.id ?: "")
-                            dataStore.saveUserName(loginResponse?.user?.full_name ?: "")
+                            val dataStore = SeniorDataStore(context)
+                            dataStore.saveAuthToken(loginResponse.access_token)
+                            dataStore.saveUserId(loginResponse.user.id)
+                            dataStore.saveUserName(loginResponse.user.full_name)
 
                             val intent = Intent(context, MainActivity::class.java)
                             context.startActivity(intent)
