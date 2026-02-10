@@ -40,6 +40,13 @@ class MainActivity : ComponentActivity() {
 
         dataStore = SeniorDataStore(this)
 
+        // Redirect to login if not authenticated
+        if (!dataStore.isLoggedIn()) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
+
         setContent {
             SeniorCareTheme {
                 MainScreen(
@@ -63,11 +70,12 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.POST_NOTIFICATIONS
         )
 
-        permissions.forEach { permission ->
-            if (ContextCompat.checkSelfPermission(this, permission)
-                != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, permissions, 100)
-            }
+        val permissionsToRequest = permissions.filter { permission ->
+            ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
+        }.toTypedArray()
+
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsToRequest, 100)
         }
     }
 
