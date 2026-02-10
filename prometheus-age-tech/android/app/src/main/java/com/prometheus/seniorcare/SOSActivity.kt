@@ -1,142 +1,170 @@
 package com.prometheus.seniorcare
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.prometheus.seniorcare.data.ApiClient
+import com.prometheus.seniorcare.data.SeniorDataStore
+import com.prometheus.seniorcare.data.models.SOSRequest
+import com.prometheus.seniorcare.ui.theme.SeniorCareTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class SOSActivity : ComponentActivity() {
-
-    companion object {
-        private const val LOCATION_PERMISSION_REQUEST = 1001
-    }
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Request location permission for GPS sharing
-        if (ActivityCompat.checkSelfPermission(
-                this, Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                LOCATION_PERMISSION_REQUEST
-            )
-        }
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         setContent {
-            MaterialTheme {
-                SOSScreen(onBackClick = { finish() })
+            SeniorCareTheme {
+                SOSScreen()
             }
         }
     }
 }
 
 @Composable
-fun SOSScreen(onBackClick: () -> Unit) {
-    var alertSent by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
+fun SOSScreen() {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var countdown by remember { mutableStateOf(10) }
+    var locationSent by remember { mutableStateOf(false) }
+
+    // Countdown timer
+    LaunchedEffect(Unit) {
+        while (countdown > 0) {
+            delay(1000)
+            countdown--
+        }
+
+        // Countdown reached 0, send SOS
+        sendSOSAlert(context, scope) {
+            locationSent = true
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .background(MaterialTheme.colorScheme.errorContainer),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        if (alertSent) {
-            Text(
-                text = "✓ SOS Alert Sent!",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Green,
-                textAlign = TextAlign.Center
-            )
+        Text(
+            text = "SKUBI PAGALBA",
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.error,
+            fontWeight = FontWeight.Bold
+        )
 
-            Text(
-                text = "Help is on the way. Your emergency contacts have been notified.",
-                fontSize = 18.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(vertical = 24.dp)
-            )
+        Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .height(56.dp)
-            ) {
-                Text(text = "Back to Home", fontSize = 18.sp)
-            }
-        } else {
-            Text(
-                text = "Emergency SOS",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Red
-            )
+        Text(
+            text = "Skambinama per: $countdown s",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onErrorContainer
+        )
 
-            Text(
-                text = "Press the button below to send an emergency alert to all your contacts",
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(vertical = 24.dp)
-            )
+        Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
-                onClick = {
-                    scope.launch {
-                        isLoading = true
-                        val success = ApiClient.sendSOSAlert()
-                        isLoading = false
-                        if (success) {
-                            alertSent = true
+        if (locationSent) {
+            Text(
+                text = "✅ Jūsų vieta nusiųsta artimiesiems",
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = {
+                // Cancel SOS
+                (context as? SOSActivity)?.finish()
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            ),
+            modifier = Modifier.width(200.dp)
+        ) {
+            Text("Atšaukti", fontSize = 18.sp)
+        }
+    }
+}
+
+private fun sendSOSAlert(context: android.content.Context, scope: CoroutineScope, onLocationSent: () -> Unit = {}) {
+    scope.launch {
+        try {
+            // Get current location
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    if (location != null) {
+                        // Send to API
+                        val dataStore = SeniorDataStore(context)
+                        val userId = dataStore.getUserId()
+                        val token = dataStore.getAuthToken()
+
+                        val apiService = ApiClient.createService(token)
+                        val sosRequest = SOSRequest(
+                            senior_id = userId,
+                            latitude = location.latitude,
+                            longitude = location.longitude,
+                            timestamp = System.currentTimeMillis()
+                        )
+
+                        // Call API
+                        scope.launch {
+                            try {
+                                apiService.sendSOSAlert(sosRequest)
+                                onLocationSent()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
                     }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                modifier = Modifier
-                    .size(250.dp)
-                    .padding(16.dp),
-                enabled = !isLoading
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(color = Color.White)
-                } else {
-                    Text(
-                        text = "SEND\nSOS",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
 
-            TextButton(
-                onClick = onBackClick,
-                modifier = Modifier.padding(top = 32.dp)
-            ) {
-                Text(text = "Cancel", fontSize = 18.sp)
+            // Call emergency number
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE)
+                == PackageManager.PERMISSION_GRANTED) {
+                val intent = Intent(Intent.ACTION_CALL).apply {
+                    data = Uri.parse("tel:112")
+                }
+                context.startActivity(intent)
+            } else {
+                val intent = Intent(Intent.ACTION_DIAL).apply {
+                    data = Uri.parse("tel:112")
+                }
+                context.startActivity(intent)
             }
+
+        } catch (e: Exception) {
+            Toast.makeText(context, "SOS klaida: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 }
