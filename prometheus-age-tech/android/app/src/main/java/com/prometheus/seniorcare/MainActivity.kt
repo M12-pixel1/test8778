@@ -13,18 +13,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.prometheus.seniorcare.data.SeniorDataStore
+import com.prometheus.seniorcare.services.DailyCheckService
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val dataStore = SeniorDataStore(this)
+
+        // Start daily check service
+        val serviceIntent = Intent(this, DailyCheckService::class.java)
+        startService(serviceIntent)
+
         setContent {
             MaterialTheme {
                 MainScreen(
+                    userName = dataStore.getUserName() ?: "User",
                     onSOSClick = {
                         startActivity(Intent(this, SOSActivity::class.java))
                     },
                     onCheckInClick = { /* Daily check-in logic */ },
                     onLogoutClick = {
+                        kotlinx.coroutines.MainScope().launch {
+                            dataStore.clearAuth()
+                        }
                         startActivity(Intent(this, LoginActivity::class.java))
                         finish()
                     }
@@ -36,6 +50,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainScreen(
+    userName: String,
     onSOSClick: () -> Unit,
     onCheckInClick: () -> Unit,
     onLogoutClick: () -> Unit
@@ -55,7 +70,7 @@ fun MainScreen(
         )
 
         Text(
-            text = "Welcome! How are you today?",
+            text = "Welcome, $userName! How are you today?",
             fontSize = 20.sp,
             modifier = Modifier.padding(16.dp)
         )

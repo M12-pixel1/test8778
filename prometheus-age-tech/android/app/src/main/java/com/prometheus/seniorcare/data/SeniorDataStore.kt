@@ -1,51 +1,82 @@
 package com.prometheus.seniorcare.data
 
 import android.content.Context
-import android.content.SharedPreferences
+import androidx.datastore.preferences.core.*
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 
-/**
- * Local data store for caching senior data and preferences.
- */
+private val Context.dataStore by preferencesDataStore(name = "senior_preferences")
+
 class SeniorDataStore(context: Context) {
+    private val dataStore = context.dataStore
 
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences("prometheus_senior_prefs", Context.MODE_PRIVATE)
+    companion object {
+        private val AUTH_TOKEN = stringPreferencesKey("auth_token")
+        private val USER_ID = stringPreferencesKey("user_id")
+        private val USER_NAME = stringPreferencesKey("user_name")
+        private val USER_PHONE = stringPreferencesKey("user_phone")
+        private val LAST_DAILY_CHECK = longPreferencesKey("last_daily_check")
+    }
 
-    fun saveAuthToken(token: String) {
-        prefs.edit().putString(KEY_AUTH_TOKEN, token).apply()
+    suspend fun saveAuthToken(token: String) {
+        dataStore.edit { preferences ->
+            preferences[AUTH_TOKEN] = token
+        }
+    }
+
+    suspend fun saveUserId(id: String) {
+        dataStore.edit { preferences ->
+            preferences[USER_ID] = id
+        }
+    }
+
+    suspend fun saveUserName(name: String) {
+        dataStore.edit { preferences ->
+            preferences[USER_NAME] = name
+        }
+    }
+
+    suspend fun saveUserPhone(phone: String) {
+        dataStore.edit { preferences ->
+            preferences[USER_PHONE] = phone
+        }
+    }
+
+    suspend fun saveLastDailyCheck(timestamp: Long) {
+        dataStore.edit { preferences ->
+            preferences[LAST_DAILY_CHECK] = timestamp
+        }
     }
 
     fun getAuthToken(): String? {
-        return prefs.getString(KEY_AUTH_TOKEN, null)
+        return runBlocking {
+            dataStore.data.map { it[AUTH_TOKEN] }.first()
+        }
     }
 
-    fun saveSeniorId(id: Int) {
-        prefs.edit().putInt(KEY_SENIOR_ID, id).apply()
+    fun getUserId(): String? {
+        return runBlocking {
+            dataStore.data.map { it[USER_ID] }.first()
+        }
     }
 
-    fun getSeniorId(): Int {
-        return prefs.getInt(KEY_SENIOR_ID, -1)
-    }
-
-    fun saveSeniorName(name: String) {
-        prefs.edit().putString(KEY_SENIOR_NAME, name).apply()
-    }
-
-    fun getSeniorName(): String? {
-        return prefs.getString(KEY_SENIOR_NAME, null)
+    fun getUserName(): String? {
+        return runBlocking {
+            dataStore.data.map { it[USER_NAME] }.first()
+        }
     }
 
     fun isLoggedIn(): Boolean {
-        return getAuthToken() != null
+        return getAuthToken() != null && getUserId() != null
     }
 
-    fun clearAll() {
-        prefs.edit().clear().apply()
-    }
-
-    companion object {
-        private const val KEY_AUTH_TOKEN = "auth_token"
-        private const val KEY_SENIOR_ID = "senior_id"
-        private const val KEY_SENIOR_NAME = "senior_name"
+    suspend fun clearAuth() {
+        dataStore.edit { preferences ->
+            preferences.remove(AUTH_TOKEN)
+            preferences.remove(USER_ID)
+            preferences.remove(USER_NAME)
+        }
     }
 }

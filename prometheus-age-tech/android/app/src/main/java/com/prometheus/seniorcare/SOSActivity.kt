@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import com.prometheus.seniorcare.data.ApiClient
+import com.prometheus.seniorcare.data.SOSRequest
+import com.prometheus.seniorcare.data.SeniorDataStore
 import kotlinx.coroutines.launch
 
 class SOSActivity : ComponentActivity() {
@@ -27,6 +29,8 @@ class SOSActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val dataStore = SeniorDataStore(this)
 
         // Request location permission for GPS sharing
         if (ActivityCompat.checkSelfPermission(
@@ -42,14 +46,14 @@ class SOSActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                SOSScreen(onBackClick = { finish() })
+                SOSScreen(dataStore = dataStore, onBackClick = { finish() })
             }
         }
     }
 }
 
 @Composable
-fun SOSScreen(onBackClick: () -> Unit) {
+fun SOSScreen(dataStore: SeniorDataStore, onBackClick: () -> Unit) {
     var alertSent by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -105,11 +109,26 @@ fun SOSScreen(onBackClick: () -> Unit) {
                 onClick = {
                     scope.launch {
                         isLoading = true
-                        val success = ApiClient.sendSOSAlert()
-                        isLoading = false
-                        if (success) {
-                            alertSent = true
+                        try {
+                            val token = dataStore.getAuthToken()
+                            val userId = dataStore.getUserId()
+                            if (token != null && userId != null) {
+                                val service = ApiClient.createService(token)
+                                val request = SOSRequest(
+                                    senior_id = userId,
+                                    latitude = 0.0,
+                                    longitude = 0.0,
+                                    timestamp = System.currentTimeMillis()
+                                )
+                                val response = service.sendSOSAlert(request)
+                                if (response.isSuccessful) {
+                                    alertSent = true
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
+                        isLoading = false
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Red),

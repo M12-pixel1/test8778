@@ -14,14 +14,26 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.prometheus.seniorcare.data.ApiClient
+import com.prometheus.seniorcare.data.LoginRequest
+import com.prometheus.seniorcare.data.SeniorDataStore
 import kotlinx.coroutines.launch
 
 class LoginActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val dataStore = SeniorDataStore(this)
+
+        // Skip login if already logged in
+        if (dataStore.isLoggedIn()) {
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+            return
+        }
+
         setContent {
             MaterialTheme {
                 LoginScreen(
+                    dataStore = dataStore,
                     onLoginSuccess = {
                         startActivity(Intent(this, MainActivity::class.java))
                         finish()
@@ -33,8 +45,8 @@ class LoginActivity : ComponentActivity() {
 }
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) {
-    var username by remember { mutableStateOf("") }
+fun LoginScreen(dataStore: SeniorDataStore, onLoginSuccess: () -> Unit) {
+    var phoneNumber by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -61,9 +73,9 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         )
 
         OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("Username") },
+            value = phoneNumber,
+            onValueChange = { phoneNumber = it },
+            label = { Text("Phone Number") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
@@ -94,19 +106,33 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 scope.launch {
                     isLoading = true
                     errorMessage = ""
-                    val success = ApiClient.login(username, password)
-                    isLoading = false
-                    if (success) {
-                        onLoginSuccess()
-                    } else {
-                        errorMessage = "Invalid credentials. Please try again."
+                    try {
+                        val service = ApiClient.createService()
+                        val response = service.login(LoginRequest(phoneNumber, password))
+                        if (response.isSuccessful) {
+                            val body = response.body()
+                            if (body != null) {
+                                dataStore.saveAuthToken(body.access_token)
+                                dataStore.saveUserId(body.user.id)
+                                dataStore.saveUserName(body.user.full_name)
+                                dataStore.saveUserPhone(body.user.phone_number)
+                                onLoginSuccess()
+                            } else {
+                                errorMessage = "Invalid response from server."
+                            }
+                        } else {
+                            errorMessage = "Invalid credentials. Please try again."
+                        }
+                    } catch (e: Exception) {
+                        errorMessage = "Connection error. Please check your network."
                     }
+                    isLoading = false
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            enabled = !isLoading && username.isNotBlank() && password.isNotBlank()
+            enabled = !isLoading && phoneNumber.isNotBlank() && password.isNotBlank()
         ) {
             if (isLoading) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)

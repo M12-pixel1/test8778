@@ -1,104 +1,119 @@
 package com.prometheus.seniorcare.data
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.*
+import java.util.concurrent.TimeUnit
 
-/**
- * API client for communicating with the Prometheus AgeTech backend.
- */
 object ApiClient {
+    private const val BASE_URL = "http://10.0.2.2:8000/" // Localhost for emulator
+    // For real device: "http://YOUR_SERVER_IP:8000/"
 
-    private const val BASE_URL = "http://10.0.2.2:8000"
-    private var authToken: String? = null
+    fun createService(token: String? = null): ApiService {
+        val interceptor = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
 
-    suspend fun login(username: String, password: String): Boolean {
-        return withContext(Dispatchers.IO) {
-            try {
-                val url = URL("$BASE_URL/auth/login")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.doOutput = true
+        val clientBuilder = OkHttpClient.Builder()
+            .addInterceptor(interceptor)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
 
-                val body = """{"username":"$username","password":"$password"}"""
-                OutputStreamWriter(connection.outputStream).use { it.write(body) }
-
-                if (connection.responseCode == 200) {
-                    val response = connection.inputStream.bufferedReader().readText()
-                    // Parse token from response (simplified)
-                    authToken = parseToken(response)
-                    true
-                } else {
-                    false
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                false
+        if (token != null) {
+            clientBuilder.addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("Authorization", "Bearer $token")
+                    .build()
+                chain.proceed(request)
             }
         }
-    }
 
-    suspend fun sendSOSAlert(
-        latitude: Double? = null,
-        longitude: Double? = null,
-        message: String = "Emergency SOS Alert"
-    ): Boolean {
-        return withContext(Dispatchers.IO) {
-            try {
-                val url = URL("$BASE_URL/seniors/sos/alert")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.setRequestProperty("Authorization", "Bearer $authToken")
-                connection.doOutput = true
-
-                val body = buildString {
-                    append("{\"message\":\"$message\"")
-                    latitude?.let { append(",\"latitude\":$it") }
-                    longitude?.let { append(",\"longitude\":$it") }
-                    append("}")
-                }
-                OutputStreamWriter(connection.outputStream).use { it.write(body) }
-
-                connection.responseCode == 201
-            } catch (e: Exception) {
-                e.printStackTrace()
-                false
-            }
-        }
-    }
-
-    suspend fun dailyCheckIn(seniorId: Int, mood: String, notes: String? = null): Boolean {
-        return withContext(Dispatchers.IO) {
-            try {
-                val url = URL("$BASE_URL/seniors/$seniorId/checkin")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.setRequestProperty("Authorization", "Bearer $authToken")
-                connection.doOutput = true
-
-                val body = buildString {
-                    append("{\"mood\":\"$mood\"")
-                    notes?.let { append(",\"notes\":\"$it\"") }
-                    append("}")
-                }
-                OutputStreamWriter(connection.outputStream).use { it.write(body) }
-
-                connection.responseCode == 200
-            } catch (e: Exception) {
-                e.printStackTrace()
-                false
-            }
-        }
-    }
-
-    private fun parseToken(response: String): String? {
-        // Simple JSON parsing for access_token field
-        val tokenRegex = """"access_token"\s*:\s*"([^"]+)"""".toRegex()
-        return tokenRegex.find(response)?.groupValues?.get(1)
+        return Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(clientBuilder.build())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApiService::class.java)
     }
 }
+
+interface ApiService {
+    @POST("api/v1/auth/login")
+    suspend fun login(@Body request: LoginRequest): retrofit2.Response<LoginResponse>
+
+    @GET("api/v1/users/me")
+    suspend fun getProfile(): retrofit2.Response<UserProfile>
+
+    @GET("api/v1/seniors/{senior_id}/dashboard")
+    suspend fun getSeniorDashboard(@Path("senior_id") seniorId: String): retrofit2.Response<DashboardResponse>
+
+    @POST("api/v1/sos/alert")
+    suspend fun sendSOSAlert(@Body request: SOSRequest): retrofit2.Response<SOSResponse>
+
+    @POST("api/v1/seniors/daily-check")
+    suspend fun sendDailyCheck(@Body request: DailyCheckRequest): retrofit2.Response<DailyCheckResponse>
+}
+
+// Data classes
+data class LoginRequest(
+    val phone_number: String,
+    val password: String
+)
+
+data class LoginResponse(
+    val access_token: String,
+    val token_type: String,
+    val user: UserResponse
+)
+
+data class UserResponse(
+    val id: String,
+    val phone_number: String,
+    val role: String,
+    val full_name: String,
+    val status: String,
+    val created_at: String
+)
+
+data class UserProfile(
+    val id: String,
+    val phone_number: String,
+    val role: String,
+    val full_name: String,
+    val status: String,
+    val created_at: String
+)
+
+data class DashboardResponse(
+    val senior_id: String,
+    val status: String,
+    val last_check_in: String? = null
+)
+
+data class SOSRequest(
+    val senior_id: String,
+    val latitude: Double,
+    val longitude: Double,
+    val timestamp: Long
+)
+
+data class SOSResponse(
+    val id: String,
+    val status: String,
+    val message: String? = null
+)
+
+data class DailyCheckRequest(
+    val senior_id: String,
+    val status: String,
+    val timestamp: Long
+)
+
+data class DailyCheckResponse(
+    val id: String,
+    val status: String,
+    val message: String? = null
+)
