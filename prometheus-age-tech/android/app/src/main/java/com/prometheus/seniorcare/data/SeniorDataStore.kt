@@ -39,6 +39,14 @@ class SeniorDataStore(context: Context) {
         return getAuthToken() != null
     }
 
+    fun getUserName(): String? {
+        return getSeniorName()
+    }
+
+    fun clearAuth() {
+        clearAll()
+    }
+
     fun clearAll() {
         prefs.edit().clear().apply()
     }
